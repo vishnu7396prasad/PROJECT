@@ -1,225 +1,300 @@
-import { useState, useEffect } from "react"
-import axios from "axios"
-import { useNavigate } from "react-router-dom"
+import { useEffect, useState } from "react";
 
-function Admin() {
+import API from "../services/api";
 
-  const [name, setName] = useState("")
-  const [specialization, setSpecialization] = useState("")
-  const [experience, setExperience] = useState("")
-  const [doctors, setDoctors] = useState([])
-  const [appointments, setAppointments] = useState([])
+const pageStyle = {
+  padding: "20px",
+  background: "#f4f6f9",
+  minHeight: "100vh",
+};
 
-  const navigate = useNavigate()
-  const [loading, setLoading] = useState(true)
+const gridStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gap: "20px",
+  marginBottom: "30px",
+};
 
-  // Admin check
-  useEffect(() => {
-    const user = JSON.parse(localStorage.getItem("user"))
-
-    if (!user || user.role !== "admin") {
-      navigate("/login")
-    } else {
-      setLoading(false)
-      fetchDoctors()
-      fetchAppointments()
-    }
-  }, [])
-
-  // Fetch Doctors
-  const fetchDoctors = async () => {
-    try {
-      const res = await axios.get("http://localhost:5000/api/doctors")
-      setDoctors(res.data)
-    } catch (err) {
-      console.log(err)
-    }
-  }
-
-  // Fetch Appointments
-  const fetchAppointments = async () => {
-    try {
-      const res = await axios.get("http://localhost:5000/api/appointments")
-      setAppointments(res.data)
-    } catch (err) {
-      console.log(err)
-    }
-  }
-
-  // Add Doctor
-  const handleAddDoctor = async () => {
-    try {
-      await axios.post("http://localhost:5000/api/doctors", {
-        name,
-        specialization,
-        experience: Number(experience)
-      })
-
-      alert("Doctor Added")
-
-      setName("")
-      setSpecialization("")
-      setExperience("")
-
-      fetchDoctors()
-
-    } catch (err) {
-      console.log(err)
-      alert("Error adding doctor")
-    }
-  }
-
-  // Delete Doctor
-  const deleteDoctor = async (id) => {
-    await axios.delete(`http://localhost:5000/api/doctors/${id}`)
-    fetchDoctors()
-  }
-
-  // Edit Doctor
-  const editDoctor = async (doc) => {
-    const newName = prompt("New name", doc.name)
-    if (!newName) return
-
-    await axios.put(`http://localhost:5000/api/doctors/${doc._id}`, {
-      ...doc,
-      name: newName
-    })
-
-    fetchDoctors()
-  }
-
-  // Styles
-  
-  const cardBox = {
+const cardBoxStyle = {
   background: "linear-gradient(135deg, #1e3a8a, #2563eb)",
   color: "#fff",
   padding: "20px",
   borderRadius: "12px",
   textAlign: "center",
-  boxShadow: "0 4px 10px rgba(0,0,0,0.1)"
+  boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
 };
 
-const section = {
+const sectionStyle = {
   background: "#fff",
   padding: "20px",
   borderRadius: "10px",
   marginBottom: "20px",
-  boxShadow: "0 2px 8px rgba(0,0,0,0.05)"
+  boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
 };
 
-const input = {
+const formRowStyle = {
+  display: "flex",
+  gap: "10px",
+  flexWrap: "wrap",
+};
+
+const inputStyle = {
   padding: "10px",
   borderRadius: "6px",
   border: "1px solid #ccc",
-  flex: "1",
-  minWidth: "150px"
+  flex: 1,
+  minWidth: "150px",
 };
 
-const addBtn = {
+const addButtonStyle = {
   background: "#2563eb",
   color: "#fff",
   border: "none",
   padding: "10px 15px",
   borderRadius: "6px",
-  cursor: "pointer"
+  cursor: "pointer",
 };
 
-const doctorCard = {
+const doctorCardStyle = {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
+  gap: "16px",
   padding: "15px",
   border: "1px solid #eee",
   borderRadius: "8px",
-  marginTop: "10px"
+  marginTop: "10px",
+  flexWrap: "wrap",
 };
 
-const editBtn = {
+const editButtonStyle = {
   background: "#facc15",
   border: "none",
   padding: "8px 12px",
   borderRadius: "5px",
-  cursor: "pointer"
+  cursor: "pointer",
 };
 
-const deleteBtn = {
+const deleteButtonStyle = {
   background: "#ef4444",
   color: "#fff",
   border: "none",
   padding: "8px 12px",
   borderRadius: "5px",
-  cursor: "pointer"
+  cursor: "pointer",
 };
 
-  if (loading) return <h2 style={{ textAlign: "center" }}>Loading...</h2>
+const emptyStateStyle = {
+  color: "#666",
+  marginTop: "10px",
+};
+
+const getTodayBookingsCount = (appointments) => {
+  const today = new Date().toISOString().slice(0, 10);
+
+  return appointments.filter(
+    (appointment) =>
+      appointment.date === today && appointment.status !== "cancelled"
+  ).length;
+};
+
+function Admin() {
+  const [form, setForm] = useState({
+    name: "",
+    specialization: "",
+    experience: "",
+  });
+  const [doctors, setDoctors] = useState([]);
+  const [appointments, setAppointments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+
+  const fetchDashboardData = async () => {
+    try {
+      const [doctorResponse, appointmentResponse] = await Promise.all([
+        API.get("/doctors"),
+        API.get("/appointments"),
+      ]);
+
+      setDoctors(doctorResponse.data);
+      setAppointments(appointmentResponse.data);
+    } catch (error) {
+      console.log(error);
+      alert(error.response?.data?.message || "Unable to load dashboard data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const handleChange = (field) => (event) => {
+    setForm((currentForm) => ({
+      ...currentForm,
+      [field]: event.target.value,
+    }));
+  };
+
+  const resetForm = () => {
+    setForm({
+      name: "",
+      specialization: "",
+      experience: "",
+    });
+  };
+
+  const handleAddDoctor = async () => {
+    if (!form.name.trim() || !form.specialization.trim() || !form.experience) {
+      alert("Please fill all doctor fields");
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      await API.post("/doctors", {
+        name: form.name,
+        specialization: form.specialization,
+        experience: Number(form.experience),
+      });
+
+      resetForm();
+      await fetchDashboardData();
+      alert("Doctor added successfully");
+    } catch (error) {
+      console.log(error);
+      alert(error.response?.data?.message || "Error adding doctor");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const deleteDoctor = async (id) => {
+    try {
+      await API.delete(`/doctors/${id}`);
+      await fetchDashboardData();
+    } catch (error) {
+      console.log(error);
+      alert(error.response?.data?.message || "Error deleting doctor");
+    }
+  };
+
+  const editDoctor = async (doctor) => {
+    const newName = prompt("New name", doctor.name);
+
+    if (!newName || !newName.trim()) {
+      return;
+    }
+
+    try {
+      await API.put(`/doctors/${doctor._id}`, {
+        name: newName,
+        specialization: doctor.specialization,
+        experience: doctor.experience,
+      });
+
+      await fetchDashboardData();
+    } catch (error) {
+      console.log(error);
+      alert(error.response?.data?.message || "Error updating doctor");
+    }
+  };
+
+  if (loading) {
+    return <h2 style={{ textAlign: "center", marginTop: "40px" }}>Loading...</h2>;
+  }
 
   return (
-  <div style={{ padding: "20px", background: "#f4f6f9", minHeight: "100vh" }}>
+    <div style={pageStyle}>
+      <h2 style={{ marginBottom: "20px" }}>Admin Dashboard</h2>
 
-    <h2 style={{ marginBottom: "20px" }}>Admin Dashboard</h2>
-
-    {/* STATS CARDS */}
-    <div style={{
-      display: "grid",
-      gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-      gap: "20px",
-      marginBottom: "30px"
-    }}>
-      
-      <div style={cardBox}>
-        <h3>Total Doctors</h3>
-        <p>{doctors.length}</p>
-      </div>
-
-      <div style={cardBox}>
-        <h3>Total Appointments</h3>
-        <p>0</p>
-      </div>
-
-      <div style={cardBox}>
-        <h3>Today Bookings</h3>
-        <p>0</p>
-      </div>
-
-    </div>
-
-    {/* ADD DOCTOR */}
-    <div style={section}>
-      <h3>Add Doctor</h3>
-
-      <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-        <input placeholder="Name" value={name} onChange={(e)=>setName(e.target.value)} style={input}/>
-        <input placeholder="Specialization" value={specialization} onChange={(e)=>setSpecialization(e.target.value)} style={input}/>
-        <input placeholder="Experience" value={experience} onChange={(e)=>setExperience(e.target.value)} style={input}/>
-        <button onClick={handleAddDoctor} style={addBtn}>Add</button>
-      </div>
-    </div>
-
-    {/* DOCTOR LIST */}
-    <div style={section}>
-      <h3>Doctors</h3>
-
-      {doctors.map((doc) => (
-        <div key={doc._id} style={doctorCard}>
-          
-          <div>
-            <h4>{doc.name}</h4>
-            <p>{doc.specialization}</p>
-            <small>{doc.experience} yrs experience</small>
-          </div>
-
-          <div style={{ display: "flex", gap: "10px" }}>
-            <button onClick={()=>editDoctor(doc)} style={editBtn}>Edit</button>
-            <button onClick={()=>deleteDoctor(doc._id)} style={deleteBtn}>Delete</button>
-          </div>
-
+      <div style={gridStyle}>
+        <div style={cardBoxStyle}>
+          <h3>Total Doctors</h3>
+          <p>{doctors.length}</p>
         </div>
-      ))}
 
+        <div style={cardBoxStyle}>
+          <h3>Total Appointments</h3>
+          <p>{appointments.length}</p>
+        </div>
+
+        <div style={cardBoxStyle}>
+          <h3>Today Bookings</h3>
+          <p>{getTodayBookingsCount(appointments)}</p>
+        </div>
+      </div>
+
+      <div style={sectionStyle}>
+        <h3>Add Doctor</h3>
+
+        <div style={formRowStyle}>
+          <input
+            placeholder="Name"
+            value={form.name}
+            onChange={handleChange("name")}
+            style={inputStyle}
+          />
+          <input
+            placeholder="Specialization"
+            value={form.specialization}
+            onChange={handleChange("specialization")}
+            style={inputStyle}
+          />
+          <input
+            type="number"
+            min="0"
+            placeholder="Experience"
+            value={form.experience}
+            onChange={handleChange("experience")}
+            style={inputStyle}
+          />
+          <button
+            onClick={handleAddDoctor}
+            style={addButtonStyle}
+            disabled={submitting}
+          >
+            {submitting ? "Saving..." : "Add"}
+          </button>
+        </div>
+      </div>
+
+      <div style={sectionStyle}>
+        <h3>Doctors</h3>
+
+        {doctors.length === 0 ? (
+          <p style={emptyStateStyle}>No doctors found.</p>
+        ) : (
+          doctors.map((doctor) => (
+            <div key={doctor._id} style={doctorCardStyle}>
+              <div>
+                <h4 style={{ margin: "0 0 6px" }}>{doctor.name}</h4>
+                <p style={{ margin: "0 0 6px" }}>{doctor.specialization}</p>
+                <small>{doctor.experience} yrs experience</small>
+              </div>
+
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button
+                  onClick={() => editDoctor(doctor)}
+                  style={editButtonStyle}
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => deleteDoctor(doctor._id)}
+                  style={deleteButtonStyle}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
     </div>
-
-  </div>
-);
+  );
 }
 
-export default Admin
+export default Admin;

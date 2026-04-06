@@ -1,107 +1,135 @@
-const express = require("express")
-const router = express.Router()
+const express = require("express");
 
-const Appointment = require("../models/Appointment")
+const Appointment = require("../models/Appointment");
+const authMiddleware = require("../middleware/authmiddleware");
+const adminMiddleware = require("../middleware/adminMiddleware");
 
+const router = express.Router();
 
-/* BOOK APPOINTMENT */
+router.post("/", authMiddleware, async (req, res) => {
+  try {
+    const { doctorId, serviceName, date, time } = req.body;
 
-router.post("/", async(req,res)=>{
+    if (!doctorId || !serviceName || !date || !time) {
+      return res.status(400).json({
+        message: "Doctor, service, date, and time are required",
+      });
+    }
 
- try{
+    const existingAppointment = await Appointment.findOne({
+      doctorId,
+      date,
+      time,
+      status: { $ne: "cancelled" },
+    });
 
-  const appointment = new Appointment(req.body)
+    if (existingAppointment) {
+      return res.status(400).json({ message: "Slot already booked" });
+    }
 
-  await appointment.save()
+    const appointment = await Appointment.create({
+      userId: req.userId,
+      doctorId,
+      serviceName: serviceName.trim(),
+      date,
+      time,
+    });
 
-  res.json({message:"Appointment booked successfully"})
+    return res.status(201).json({
+      message: "Appointment booked successfully",
+      appointment,
+    });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({ message: "Slot already booked" });
+    }
 
- }catch(err){
-
-  res.status(500).json({message:err.message})
-
- }
-
-})
-
-
-/* GET USER APPOINTMENTS */
-
-router.get("/:userId", async(req,res)=>{
-
- try{
-
-  const appointments = await Appointment.find({
-   userId:req.params.userId
-  }).populate("doctorId")
-
-  res.json(appointments)
-
- }catch(err){
-
-  res.status(500).json({message:err.message})
-
- }
-
-})
-
-
-/* GET BOOKED SLOTS */
-
-router.get("/slots/:doctorId/:date", async(req,res)=>{
-
- try{
-
-  const {doctorId ,date ,time} = req.params
-
-  const appointments = await Appointment.find({
-   doctorId,
-   date,
-   time
-  })
-
-  const bookedSlots = appointments.map(a=>a.time)
-
-  res.json(bookedSlots)
-
- }catch(err){
-
-  res.status(500).json({message:err.message})
-
- }
-
-})
-
-
-/* CANCEL APPOINTMENT */
-
-router.delete("/:id", async(req,res)=>{
-
- try{
-
-  await Appointment.findByIdAndDelete(req.params.id)
-
-  res.json({message:"Appointment cancelled successfully"})
-
- }catch(err){
-
-  res.status(500).json({message:err.message})
-
- }
-
-})
-
-router.get("/", async (req, res) => {
-  const appointments = await Appointment.find().populate("doctorId")
-  res.json(appointments)
-})
-
-router.put("/cancel/:id", async (req, res) => {
-  await Appointment.findByIdAndUpdate(req.params.id, {
-    status: "cancelled"
-  });
-
-  res.json({ message: "Cancelled" });
+    return res.status(500).json({ message: error.message });
+  }
 });
 
-module.exports = router
+router.get("/slots/:doctorId/:date", async (req, res) => {
+  try {
+    const { doctorId, date } = req.params;
+
+    const appointments = await Appointment.find({
+      doctorId,
+      date,
+      status: { $ne: "cancelled" },
+    }).select("time");
+
+    const bookedSlots = appointments.map((appointment) => appointment.time);
+
+    return res.json(bookedSlots);
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+router.get("/me", authMiddleware, async (req, res) => {
+  try {
+    const appointments = await Appointment.find({ userId: req.userId })
+      .populate("doctorId")
+      .sort({ date: 1, time: 1 });
+
+    return res.json(appointments);
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+router.get("/", authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const appointments = await Appointment.find()
+      .populate("doctorId")
+      .populate("userId", "name email role")
+      .sort({ createdAt: -1 });
+
+    return res.json(appointments);
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+router.delete("/:id", authMiddleware, async (req, res) => {
+  try {
+    const appointment = await Appointment.findById(req.params.id);
+
+    if (!appointment) {
+      return res.status(404).json({ message: "Appointment not found" });
+    }
+
+    const canManageAppointment =
+      req.role === "admin" || appointment.userId.toString() === req.userId;
+
+    if (!canManageAppointment) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    await appointment.deleteOne();
+
+    return res.json({ message: "Appointment cancelled successfully" });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+router.put("/cancel/:id", authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const appointment = await Appointment.findByIdAndUpdate(
+      req.params.id,
+      { status: "cancelled" },
+      { new: true }
+    );
+
+    if (!appointment) {
+      return res.status(404).json({ message: "Appointment not found" });
+    }
+
+    return res.json({ message: "Appointment cancelled", appointment });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+module.exports = router;

@@ -5,7 +5,6 @@ const cors = require("cors");
 
 const userRoute = require("./routes/userRoute");
 const doctorRoutes = require("./routes/doctorRoute");
-const bookingRoutes = require("./routes/bookingRoute");
 const appointmentRoute = require("./routes/appointmentRoute");
 
 const app = express();
@@ -16,8 +15,7 @@ app.use(express.json());
 
 // Routes
 app.use("/api/user", userRoute);
-app.use("/api/doctors",doctorRoutes);
-app.use("/api/booking", bookingRoutes);
+app.use("/api/doctors", doctorRoutes);
 app.use("/api/appointments", appointmentRoute);
 
 // Test Route

@@ -1,56 +1,101 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
+import { clearAuth, getStoredUser } from "../utils/auth";
+
+const linkStyle = {
+  color: "#fff",
+  textDecoration: "none",
+};
+
+const containerStyle = {
+  background: "#1e3a8a",
+  padding: "15px 20px",
+  color: "#fff",
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "16px",
+  flexWrap: "wrap",
+};
+
+const navLinksStyle = {
+  display: "flex",
+  gap: "15px",
+  alignItems: "center",
+  flexWrap: "wrap",
+};
+
+const logoutButtonStyle = {
+  border: "none",
+  borderRadius: "6px",
+  background: "#fff",
+  color: "#1e3a8a",
+  padding: "8px 12px",
+  cursor: "pointer",
+  fontWeight: 600,
+};
+
 function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
+  const user = getStoredUser();
 
-  const user = JSON.parse(localStorage.getItem("user") || "null");
+  if (
+    location.pathname === "/" ||
+    location.pathname.includes("login") ||
+    location.pathname.includes("register")
+  ) {
+    return null;
+  }
 
- if (
-  location.pathname === "/" ||
-  location.pathname.includes("login") ||
-  location.pathname.includes("register")
-) {
-  return null;
-}
-
-  if (!user) return null;
+  if (!user) {
+    return null;
+  }
 
   const handleLogout = () => {
-    localStorage.clear();
+    clearAuth();
     navigate("/login");
   };
 
   return (
-    <div style={{ background: "#1e3a8a", padding: "15px", color: "#fff", display: "flex", justifyContent: "space-between" }}>
-      
-      <h2>Doctor App</h2>
+    <div style={containerStyle}>
+      <h2 style={{ margin: 0 }}>Doctor App</h2>
 
-      <div style={{ display: "flex", gap: "15px" }}>
-        
+      <div style={navLinksStyle}>
         {user.role === "user" && (
           <>
-            <Link to="/home" style={link}>Home</Link>
-            <Link to="/doctors" style={link}>Doctors</Link>
-            <Link to="/my-appointments" style={link}>My Appointments</Link>
+            <Link to="/home" style={linkStyle}>
+              Home
+            </Link>
+            <Link to="/doctors" style={linkStyle}>
+              Doctors
+            </Link>
+            <Link to="/my-appointments" style={linkStyle}>
+              My Appointments
+            </Link>
           </>
         )}
 
         {user.role === "admin" && (
           <>
-            <Link to="/admin" style={link}>Dashboard</Link>
-            <Link to="/admin/appointments" style={link}>Appointments</Link>
-            <Link to="/admin/doctors" style={link}>Doctors</Link>
+            <Link to="/admin" style={linkStyle}>
+              Dashboard
+            </Link>
+            <Link to="/admin/appointments" style={linkStyle}>
+              Appointments
+            </Link>
+            <Link to="/admin/doctors" style={linkStyle}>
+              Doctors
+            </Link>
           </>
         )}
 
-        <button onClick={handleLogout}>Logout</button>
-
+        <button onClick={handleLogout} style={logoutButtonStyle}>
+          Logout
+        </button>
       </div>
     </div>
   );
 }
-
-const link = { color: "#fff", textDecoration: "none" };
 
 export default Navbar;

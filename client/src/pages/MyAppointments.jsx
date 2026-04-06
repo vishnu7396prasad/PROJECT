@@ -1,84 +1,82 @@
-import { useEffect, useState } from "react"
-import API from "../services/api"
+import { useEffect, useState } from "react";
 
-function MyAppointments(){
+import API from "../services/api";
 
- const [appointments,setAppointments] = useState([])
+const cardStyle = {
+  border: "1px solid #d9d9d9",
+  background: "#fff",
+  padding: "16px",
+  marginBottom: "14px",
+  borderRadius: "10px",
+};
 
- const fetchAppointments = async () => {
+const buttonStyle = {
+  background: "red",
+  color: "white",
+  border: "none",
+  borderRadius: "6px",
+  padding: "8px 12px",
+  marginTop: "10px",
+  cursor: "pointer",
+};
 
-   const res = await API.get("/booking/user/user123")
+function MyAppointments() {
+  const [appointments, setAppointments] = useState([]);
 
-   setAppointments(res.data)
+  const fetchAppointments = async () => {
+    try {
+      const response = await API.get("/appointments/me");
+      setAppointments(response.data);
+    } catch (error) {
+      console.log(error);
+      alert(error.response?.data?.message || "Unable to load appointments");
+    }
+  };
 
- }
+  useEffect(() => {
+    fetchAppointments();
+  }, []);
 
- useEffect(()=>{
-  fetchAppointments()
- },[])
+  const cancelAppointment = async (id) => {
+    try {
+      const response = await API.delete(`/appointments/${id}`);
+      alert(response.data.message);
+      await fetchAppointments();
+    } catch (error) {
+      console.log(error);
+      alert(error.response?.data?.message || "Unable to cancel appointment");
+    }
+  };
 
- const cancelAppointment = async (id) => {
+  return (
+    <div style={{ padding: "20px", background: "#f4f6f9", minHeight: "100vh" }}>
+      <h2 style={{ marginBottom: "20px" }}>My Appointments</h2>
 
- try{
+      {appointments.length === 0 ? (
+        <p>No appointments found.</p>
+      ) : (
+        appointments.map((appointment) => (
+          <div key={appointment._id} style={cardStyle}>
+            <h3 style={{ marginTop: 0 }}>
+              {appointment.doctorId?.name || "Doctor unavailable"}
+            </h3>
+            <p>Date: {appointment.date}</p>
+            <p>Time: {appointment.time}</p>
+            <p>Status: {appointment.status}</p>
 
-    console.log("Cancel ID:", id)
-
-  const res = await API.delete(`/appointments/${id}`)
-
-  alert(res.data.message)
-
-  fetchAppointments()
-
- }catch(err){
-
-  console.log(err)
-
- }
-
+            {appointment.status !== "cancelled" && (
+              <button
+                onClick={() => cancelAppointment(appointment._id)}
+                style={buttonStyle}
+              >
+                Cancel Appointment
+              </button>
+            )}
+          </div>
+        ))
+      )}
+    </div>
+  );
 }
 
- return(
-
-  <div className="p-10">
-
-   <h2 className="text-2xl font-bold mb-6">My Appointments</h2>
-
-   {appointments.length === 0 ? (
-     <p>No appointments found</p>
-   ) : (
-
-    appointments.map((a)=>(
-  
- <div key={a._id} className="border p-4 mb-4 rounded">
-
-  <h3>{a.doctorId.name}</h3>
-
-  <p>Date: {a.date}</p>
-
-  <p>Time: {a.time}</p>
-
-  <button
-   onClick={()=>cancelAppointment(a._id)}
-   style={{
-    background:"red",
-    color:"white",
-    padding:"5px 10px",
-    marginTop:"10px"
-   }}
-  >
-   Cancel Appointment
-  </button>
-
- </div>
-
-))
-
-   )}
-
-  </div>
-
- )
-
-}
-
-export default MyAppointments
+export default MyAppointments;

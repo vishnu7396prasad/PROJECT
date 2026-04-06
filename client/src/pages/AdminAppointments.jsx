@@ -1,19 +1,68 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+
+import API from "../services/api";
+
+const cardStyle = {
+  border: "1px solid #ddd",
+  padding: "14px",
+  marginTop: "10px",
+  borderRadius: "8px",
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "16px",
+  flexWrap: "wrap",
+  background: "#fff",
+};
+
+const buttonStyle = {
+  background: "red",
+  color: "#fff",
+  border: "none",
+  padding: "8px 12px",
+  borderRadius: "5px",
+  cursor: "pointer",
+  height: "fit-content",
+};
+
+const controlStyle = {
+  padding: "10px",
+  borderRadius: "6px",
+  border: "1px solid #ccc",
+};
+
+const formatAppointmentDate = (date) =>
+  new Date(date).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+
+const formatTime = (time) => {
+  if (!time) {
+    return "";
+  }
+
+  const [hour, minute] = time.split(":");
+  let normalizedHour = Number.parseInt(hour, 10);
+  const suffix = normalizedHour >= 12 ? "PM" : "AM";
+
+  normalizedHour = normalizedHour % 12 || 12;
+
+  return `${normalizedHour}:${minute} ${suffix}`;
+};
 
 function AdminAppointments() {
-
   const [appointments, setAppointments] = useState([]);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
 
-  // fetch
   const fetchAppointments = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/api/appointments");
-      setAppointments(res.data);
-    } catch (err) {
-      console.log(err);
+      const response = await API.get("/appointments");
+      setAppointments(response.data);
+    } catch (error) {
+      console.log(error);
+      alert(error.response?.data?.message || "Unable to load appointments");
     }
   };
 
@@ -21,127 +70,109 @@ function AdminAppointments() {
     fetchAppointments();
   }, []);
 
-  // cancel
   const cancelAppointment = async (id) => {
     try {
-      await axios.put(`http://localhost:5000/api/appointments/cancel/${id}`);
-      fetchAppointments();
-    } catch (err) {
-      console.log(err);
+      await API.put(`/appointments/cancel/${id}`);
+      await fetchAppointments();
+    } catch (error) {
+      console.log(error);
+      alert(error.response?.data?.message || "Unable to cancel appointment");
     }
   };
 
-  // 🔍 FILTER + SEARCH SAFE VERSION
-  const filtered = appointments.filter((a) => {
-    const userName = a.userId?.name?.toLowerCase() || "";
-    const doctorName = a.doctorId?.name?.toLowerCase() || "";
-    const text = search.toLowerCase();
+  const normalizedSearch = search.trim().toLowerCase();
 
-    const matchSearch =
-      userName.includes(text) || doctorName.includes(text);
+  const filteredAppointments = appointments.filter((appointment) => {
+    const userName = appointment.userId?.name?.toLowerCase() || "";
+    const doctorName = appointment.doctorId?.name?.toLowerCase() || "";
 
-    const matchStatus =
+    const matchesSearch =
+      !normalizedSearch ||
+      userName.includes(normalizedSearch) ||
+      doctorName.includes(normalizedSearch);
+
+    const matchesStatus =
       filter === "all" ||
-      (filter === "cancelled" && a.status === "cancelled") ||
-      (filter === "booked" && a.status !== "cancelled");
+      (filter === "cancelled" && appointment.status === "cancelled") ||
+      (filter === "booked" && appointment.status !== "cancelled");
 
-    return matchSearch && matchStatus;
+    return matchesSearch && matchesStatus;
   });
 
-  // styles
-const card = {
-  border: "1px solid #ddd",
-  padding: "10px",
-  marginTop: "10px",
-  borderRadius: "8px",
-  display: "flex",
-  justifyContent: "space-between"
-};
-
-const btn = {
-  background: "red",
-  color: "#fff",
-  border: "none",
-  padding: "8px",
-  borderRadius: "5px",
-  cursor: "pointer"
-};
-
-const formatTime = (time) => {
-  if (!time) return "";
-
-  const [hour, minute] = time.split(":");
-  let h = parseInt(hour);
-  const ampm = h >= 12 ? "PM" : "AM";
-
-  h = h % 12 || 12;
-
-  return `${h}:${minute} ${ampm}`;
-};
-
   return (
-    <div style={{ padding: "20px" }}>
-
+    <div style={{ padding: "20px", background: "#f4f6f9", minHeight: "100vh" }}>
       <h2>All Appointments</h2>
 
-      {/* SEARCH */}
-      <input
-        placeholder="Search user / doctor"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        style={{ padding: "10px", width: "250px", marginBottom: "10px" }}
-      />
+      <div
+        style={{
+          display: "flex",
+          gap: "10px",
+          flexWrap: "wrap",
+          marginBottom: "14px",
+        }}
+      >
+        <input
+          placeholder="Search user / doctor"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          style={{ ...controlStyle, width: "250px" }}
+        />
 
-      {/* FILTER */}
-      <select onChange={(e) => setFilter(e.target.value)}>
-        <option value="all">All</option>
-        <option value="booked">Booked</option>
-        <option value="cancelled">Cancelled</option>
-      </select>
+        <select
+          value={filter}
+          onChange={(event) => setFilter(event.target.value)}
+          style={controlStyle}
+        >
+          <option value="all">All</option>
+          <option value="booked">Booked</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+      </div>
 
-      {/* LIST */}
-      {filtered.map((a) => (
-        <div key={a._id} style={card}>
+      {filteredAppointments.length === 0 ? (
+        <p>No appointments found.</p>
+      ) : (
+        filteredAppointments.map((appointment) => (
+          <div key={appointment._id} style={cardStyle}>
+            <div>
+              <p>
+                <strong>User:</strong> {appointment.userId?.name || "Unknown"}
+              </p>
+              <p>
+                <strong>Doctor:</strong> {appointment.doctorId?.name || "Unknown"}
+              </p>
+              <p style={{ fontSize: "14px", color: "#0a0101" }}>
+                <strong>Date & Time:</strong>{" "}
+                {formatAppointmentDate(appointment.date)} /{" "}
+                {formatTime(appointment.time)}
+              </p>
+              <p>
+                <strong>Status:</strong>{" "}
+                <span
+                  style={{
+                    color:
+                      appointment.status === "cancelled" ? "red" : "green",
+                    fontWeight: "bold",
+                  }}
+                >
+                  {appointment.status}
+                </span>
+              </p>
+            </div>
 
-          <div>
-            <p><strong>User :</strong> {a.userId?.name}</p>
-            <p><strong>Doctor :</strong> {a.doctorId?.name}</p>
-           <p style={{ fontSize: "14px", color: "#0a0101" }}>
-            <strong>Date & Time : </strong>
-            {new Date(a.date).toLocaleDateString("en-IN", {
-                day: "2-digit",
-                month: "short",
-                year: "numeric"
-            })}
-            {"  "}
-         / {formatTime(a.time)}
-         </p>
-           
-           <p>
-            <strong>Status:</strong>{" "}
-            <span style={{
-                color: a.status === "cancelled" ? "red" : "green",
-                fontWeight: "bold"
-            }}>
-                {a.status}
-            </span>
-            </p>
-
+            {appointment.status !== "cancelled" && (
+              <button
+                onClick={() => cancelAppointment(appointment._id)}
+                style={buttonStyle}
+              >
+                Cancel
+              </button>
+            )}
           </div>
-
-          {a.status !== "cancelled" && (
-            <button onClick={() => cancelAppointment(a._id)} style={btn}>
-              Cancel
-            </button>
-          )}
-
-        </div>
-      ))}
-
+        ))
+      )}
     </div>
   );
 }
 
 export default AdminAppointments;
-
-

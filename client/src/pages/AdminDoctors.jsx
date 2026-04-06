@@ -1,16 +1,53 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+
+import API from "../services/api";
+
+const pageStyle = {
+  padding: "20px",
+  background: "#f4f6f9",
+  minHeight: "100vh",
+};
+
+const cardStyle = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "16px",
+  padding: "15px",
+  borderRadius: "10px",
+  background: "#fff",
+  marginBottom: "15px",
+  boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+  flexWrap: "wrap",
+};
+
+const editButtonStyle = {
+  background: "#facc15",
+  border: "none",
+  padding: "8px 12px",
+  borderRadius: "5px",
+  cursor: "pointer",
+};
+
+const deleteButtonStyle = {
+  background: "#ef4444",
+  color: "#fff",
+  border: "none",
+  padding: "8px 12px",
+  borderRadius: "5px",
+  cursor: "pointer",
+};
 
 function AdminDoctors() {
   const [doctors, setDoctors] = useState([]);
 
-  // fetch doctors
   const fetchDoctors = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/api/doctors");
-      setDoctors(res.data);
-    } catch (err) {
-      console.log(err);
+      const response = await API.get("/doctors");
+      setDoctors(response.data);
+    } catch (error) {
+      console.log(error);
+      alert(error.response?.data?.message || "Unable to load doctors");
     }
   };
 
@@ -18,87 +55,70 @@ function AdminDoctors() {
     fetchDoctors();
   }, []);
 
-  // delete
   const deleteDoctor = async (id) => {
     try {
-      await axios.delete(`http://localhost:5000/api/doctors/${id}`);
-      fetchDoctors();
-    } catch (err) {
-      console.log(err);
+      await API.delete(`/doctors/${id}`);
+      await fetchDoctors();
+    } catch (error) {
+      console.log(error);
+      alert(error.response?.data?.message || "Unable to delete doctor");
     }
   };
 
-  // edit
-  const editDoctor = async (doc) => {
-    const newName = prompt("Enter new name", doc.name);
-    if (!newName) return;
+  const editDoctor = async (doctor) => {
+    const newName = prompt("Enter new name", doctor.name);
+
+    if (!newName || !newName.trim()) {
+      return;
+    }
 
     try {
-      await axios.put(`http://localhost:5000/api/doctors/${doc._id}`, {
-        ...doc,
+      await API.put(`/doctors/${doctor._id}`, {
         name: newName,
+        specialization: doctor.specialization,
+        experience: doctor.experience,
       });
-      fetchDoctors();
-    } catch (err) {
-      console.log(err);
+
+      await fetchDoctors();
+    } catch (error) {
+      console.log(error);
+      alert(error.response?.data?.message || "Unable to update doctor");
     }
   };
 
-  const card = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  padding: "15px",
-  borderRadius: "10px",
-  background: "#fff",
-  marginBottom: "15px",
-  boxShadow: "0 2px 8px rgba(0,0,0,0.05)"
-};
-
-const editBtn = {
-  background: "#facc15",
-  border: "none",
-  padding: "8px 12px",
-  borderRadius: "5px",
-  cursor: "pointer"
-};
-
-const deleteBtn = {
-  background: "#ef4444",
-  color: "#fff",
-  border: "none",
-  padding: "8px 12px",
-  borderRadius: "5px",
-  cursor: "pointer"
-};
-
   return (
-    <div style={{ padding: "20px", background: "#f4f6f9", minHeight: "100vh" }}>
-      
+    <div style={pageStyle}>
       <h2 style={{ marginBottom: "20px" }}>Doctors</h2>
 
-      {doctors.map((doc) => (
-        <div key={doc._id} style={card}>
-          
-          <div>
-            <h3>{doc.name}</h3>
-            <p>{doc.specialization}</p>
-            <small>{doc.experience} yrs experience</small>
+      {doctors.length === 0 ? (
+        <p>No doctors found.</p>
+      ) : (
+        doctors.map((doctor) => (
+          <div key={doctor._id} style={cardStyle}>
+            <div>
+              <h3 style={{ margin: "0 0 6px" }}>{doctor.name}</h3>
+              <p style={{ margin: "0 0 6px" }}>{doctor.specialization}</p>
+              <small>{doctor.experience} yrs experience</small>
+            </div>
+
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button
+                style={editButtonStyle}
+                onClick={() => editDoctor(doctor)}
+              >
+                Edit
+              </button>
+
+              <button
+                style={deleteButtonStyle}
+                onClick={() => deleteDoctor(doctor._id)}
+              >
+                Delete
+              </button>
+            </div>
           </div>
-
-          <div style={{ display: "flex", gap: "10px" }}>
-            <button style={editBtn} onClick={() => editDoctor(doc)}>
-              Edit
-            </button>
-
-            <button style={deleteBtn} onClick={() => deleteDoctor(doc._id)}>
-              Delete
-            </button>
-          </div>
-
-        </div>
-      ))}
-
+        ))
+      )}
     </div>
   );
 }
